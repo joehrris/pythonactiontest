@@ -1,7 +1,6 @@
 name: The Ruthless Deal Sniper
 
 on:
-  push:
     branches:
       - main
   workflow_dispatch: # This lets us test it manually

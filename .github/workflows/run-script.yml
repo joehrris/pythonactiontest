@@ -1,9 +1,8 @@
 name: The Ruthless Deal Sniper
 
 on:
-    branches:
-      - main
-  workflow_dispatch: # This lets us test it manually
+  workflow_dispatch: # Allows manual triggering from the Actions tab
+
 
 jobs:
   sniper-job:

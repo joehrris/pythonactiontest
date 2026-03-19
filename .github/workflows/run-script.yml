@@ -1,0 +1,28 @@
+name: Run My Python Script
+
+# This controls WHEN the script runs
+# This controls WHEN the script runs
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: 
+  schedule:
+    - cron: '6 13 * * *' # Runs at 13:06 (1:06 PM) UTC
+
+# This controls WHAT happens
+jobs:
+  run-python-job:
+    runs-on: ubuntu-latest # The free server type
+
+    steps:
+      - name: 1. Grab the code from the repository
+        uses: actions/checkout@v4
+
+      - name: 2. Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11' # You can change this to match your needs
+
+      - name: 3. Execute the script
+        run: python hello.py

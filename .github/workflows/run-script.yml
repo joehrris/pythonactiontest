@@ -1,11 +1,10 @@
-name: The Ruthless Deal Sniper
+name: AI Morning Briefing
 
 on:
-  workflow_dispatch: # Allows manual triggering from the Actions tab
-
+  workflow_dispatch: # Allows manual triggering and cron-job.org
 
 jobs:
-  sniper-job:
+  briefing-job:
     runs-on: ubuntu-latest
 
     steps:
@@ -17,11 +16,12 @@ jobs:
         with:
           python-version: '3.11' 
 
-      - name: 3. Install Scraping Libraries
-        run: pip install requests beautifulsoup4
+      - name: 3. Install Required Libraries
+        run: pip install requests beautifulsoup4 google-generativeai
 
-      - name: 4. Execute the Sniper Script
+      - name: 4. Execute the AI Briefing Script
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python sniper.py
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python ai-briefing.py

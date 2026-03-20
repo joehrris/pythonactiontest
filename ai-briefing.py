@@ -39,7 +39,7 @@ def check_pi_stock():
 def generate_ai_briefing(weather_data, stock_data):
     """Passes the raw intel to the AI to write the message"""
     genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    model = genai.GenerativeModel('gemini-2.5-flash')
     
     prompt = f"""
     You are my highly capable personal assistant. Write a short, engaging morning text message for me.

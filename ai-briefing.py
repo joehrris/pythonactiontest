@@ -142,7 +142,7 @@ def generate_ai_briefing(weather_data, stock_data, calendar_data):
     CRITICAL INSTRUCTIONS:
     1. First, check if I have a WORK SHIFT today or tomorrow. If I do, make sure to highlight it near the beginning so I don't miss it.
     2. Mention any other regular events happening today/tomorrow.
-    3. If I have upcoming deadlines listed, you MUST explicitly inform me of them using a format similar to this: "Just a heads up, your deadlines are on the following dates: [List them out]". 
+    3. If I have upcoming deadlines listed, you MUST explicitly inform me of them and prioritise them based on how close they're to being needed to be done using a format similar to this: "Just a heads up, your deadlines are on the following dates: [List them out]". 
     4. If the Pi is in stock, emphasize it heavily!
     """
 

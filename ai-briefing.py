@@ -109,8 +109,8 @@ def generate_ai_briefing(weather_data, stock_data, calendar_data):
     """Passes the raw intel to the AI to write the message"""
     genai.configure(api_key=GEMINI_API_KEY)
     
-    # Updated to a valid and fast model version
-    model = genai.GenerativeModel('gemini-2.0-flash')
+    # Reverting to your originally selected lightweight model
+    model = genai.GenerativeModel('gemini-2.5-flash-lite')
 
     # Handle empty calendar edge cases cleanly
     if not calendar_data or "Calendar not configured" in calendar_data or "Calendar error" in calendar_data:

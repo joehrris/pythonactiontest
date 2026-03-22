@@ -10,6 +10,7 @@ import base64
 BOT_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+TARGET_CALENDAR = os.environ.get("GOOGLE_CALENDAR_ID") # Variable for your shared calendar
 
 def get_coventry_weather():
     """Fetches raw weather data for Coventry"""
@@ -42,11 +43,14 @@ def check_pi_stock():
 def get_calendar_events():
     """Fetches calendar events for today/tomorrow using a base64 env var"""
     
-    # Grab the base64 string from the environment variable
+    # Grab the base64 string and calendar ID from the environment
     b64_secret = os.environ.get("CALENDAR_SERVICE_ACCOUNT")
     
     if not b64_secret:
         return "Calendar not configured. Missing CALENDAR_SERVICE_ACCOUNT env var."
+    
+    if not TARGET_CALENDAR:
+        return "Calendar ID not configured. Missing GOOGLE_CALENDAR_ID env var."
 
     try:
         # Decode the base64 string back into a dictionary
@@ -68,8 +72,9 @@ def get_calendar_events():
         today = datetime.now()
         tomorrow = today + timedelta(days=1)
 
+        # Query YOUR personal calendar using the TARGET_CALENDAR variable
         events_result = service.events().list(
-            calendarId='primary',
+            calendarId=TARGET_CALENDAR, 
             timeMin=(today - timedelta(days=1)).isoformat() + 'Z',
             timeMax=(tomorrow + timedelta(days=1)).isoformat() + 'Z',
             maxResults=50,
@@ -79,7 +84,7 @@ def get_calendar_events():
 
         events = events_result.get('items', [])
         if not events:
-            return "No calendar events for today."
+            return "No events scheduled."
 
         event_list = []
         for event in events:
@@ -109,7 +114,7 @@ def generate_ai_briefing(weather_data, stock_data, calendar_data):
     """Passes the raw intel to the AI to write the message"""
     genai.configure(api_key=GEMINI_API_KEY)
     
-    # Reverting to your originally selected lightweight model
+    # Using your preferred lightweight model
     model = genai.GenerativeModel('gemini-2.5-flash-lite')
 
     # Handle empty calendar edge cases cleanly

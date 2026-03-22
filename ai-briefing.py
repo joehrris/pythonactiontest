@@ -6,11 +6,11 @@ from datetime import datetime, timedelta
 import json
 import base64
 
-# Credentials from Environment Variables (Set via GitHub Vault/Secrets)
+# Credentials from Environment Variables
 BOT_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-TARGET_CALENDAR = os.environ.get("GOOGLE_CALENDAR_ID") # Variable for your shared calendar
+TARGET_CALENDAR = os.environ.get("GOOGLE_CALENDAR_ID")
 
 def get_coventry_weather():
     """Fetches raw weather data for Coventry"""
@@ -41,99 +41,109 @@ def check_pi_stock():
         return f"Error checking stock: {e}"
 
 def get_calendar_events():
-    """Fetches calendar events for today/tomorrow using a base64 env var"""
-    
-    # Grab the base64 string and calendar ID from the environment
+    """Fetches events for 48 hours AND deadlines for 60 days"""
     b64_secret = os.environ.get("CALENDAR_SERVICE_ACCOUNT")
     
-    if not b64_secret:
-        return "Calendar not configured. Missing CALENDAR_SERVICE_ACCOUNT env var."
-    
-    if not TARGET_CALENDAR:
-        return "Calendar ID not configured. Missing GOOGLE_CALENDAR_ID env var."
+    if not b64_secret or not TARGET_CALENDAR:
+        return "Calendar credentials missing."
 
     try:
-        # Decode the base64 string back into a dictionary
         decoded_bytes = base64.b64decode(b64_secret)
         service_account_info = json.loads(decoded_bytes)
 
         from google.oauth2 import service_account
         from googleapiclient.discovery import build
 
-        # Use _info to pass the dictionary directly (no files needed)
         creds = service_account.Credentials.from_service_account_info(
             service_account_info,
             scopes=['https://www.googleapis.com/auth/calendar.readonly']
         )
-
         service = build('calendar', 'v3', credentials=creds)
 
-        # Get events for today and tomorrow
+        # Set time boundaries
         today = datetime.now()
-        tomorrow = today + timedelta(days=1)
+        two_months_later = today + timedelta(days=60)
 
-        # Query YOUR personal calendar using the TARGET_CALENDAR variable
+        # Pull everything for the next 60 days (up to 150 events)
         events_result = service.events().list(
             calendarId=TARGET_CALENDAR, 
             timeMin=(today - timedelta(days=1)).isoformat() + 'Z',
-            timeMax=(tomorrow + timedelta(days=1)).isoformat() + 'Z',
-            maxResults=50,
+            timeMax=two_months_later.isoformat() + 'Z',
+            maxResults=150,
             singleEvents=True,
             orderBy='startTime'
         ).execute()
 
         events = events_result.get('items', [])
-        if not events:
-            return "No events scheduled."
+        
+        recent_events = []
+        deadline_events = []
+        
+        today_date = today.date()
+        tomorrow_date = today_date + timedelta(days=1)
 
-        event_list = []
         for event in events:
             summary = event.get('summary', 'Untitled')
+            summary_lower = summary.lower()
             start = event.get('start', {})
-            location = start.get('location', '')
-            time_parts = start.get('dateTime', start.get('date', ''))
-
-            if 'T' in time_parts:
-                time_str = time_parts.split('T')[1].split('Z')[0][:5]
+            
+            # Safely parse Google Calendar dates
+            start_date_str = start.get('dateTime', start.get('date', ''))
+            if 'T' in start_date_str:
+                date_part = start_date_str.split('T')[0]
+                time_part = start_date_str.split('T')[1].split('+')[0].split('Z')[0][:5]
             else:
-                time_str = ''
+                date_part = start_date_str
+                time_part = 'All Day'
+                
+            event_date = datetime.strptime(date_part, '%Y-%m-%d').date()
+            date_formatted = event_date.strftime('%b %d')
 
-            event_text = f"• 📅 {summary}"
-            if time_str:
-                event_text += f" — {time_str}"
-            if location:
-                event_text += f" | 📍 {location}"
-            event_list.append(event_text)
+            # --- SORTING LOGIC ---
+            
+            # 1. Is it happening Today or Tomorrow?
+            if today_date <= event_date <= tomorrow_date:
+                if "shift" in summary_lower or "work" in summary_lower:
+                    recent_events.append(f"• 💼 WORK SHIFT: {summary} ({time_part})")
+                else:
+                    recent_events.append(f"• 📅 {summary} ({time_part})")
 
-        return "\n".join(event_list[:8])
+            # 2. Is it a deadline in the next 60 days?
+            if "deadline" in summary_lower or "due" in summary_lower:
+                deadline_events.append(f"• {date_formatted} - {summary}")
+
+        # Assemble the final intel package for Gemini
+        final_intel = "=== TODAY & TOMORROW ===\n"
+        final_intel += "\n".join(recent_events) if recent_events else "No immediate events."
+        
+        final_intel += "\n\n=== UPCOMING DEADLINES (Next 2 Months) ===\n"
+        final_intel += "\n".join(deadline_events) if deadline_events else "No upcoming deadlines."
+
+        return final_intel
 
     except Exception as e:
         return f"Calendar error: {e}"
 
 def generate_ai_briefing(weather_data, stock_data, calendar_data):
-    """Passes the raw intel to the AI to write the message"""
+    """Passes the sorted intel to the AI to write the message"""
     genai.configure(api_key=GEMINI_API_KEY)
-    
-    # Using your preferred lightweight model
     model = genai.GenerativeModel('gemini-2.5-flash-lite')
-
-    # Handle empty calendar edge cases cleanly
-    if not calendar_data or "Calendar not configured" in calendar_data or "Calendar error" in calendar_data:
-        calendar_text = "No calendar events provided."
-    else:
-        calendar_text = calendar_data
 
     prompt = f"""
     You are my highly capable personal assistant. Write a short, engaging morning text message for me.
-    Keep it conversational, use a couple of emojis, and don't make it sound robotic.
+    Keep it conversational, use emojis naturally, and format it nicely for Telegram.
 
-    Here is the intel for today:
+    Here is the raw intel for today:
     - Weather in Coventry: {weather_data}
     - Raspberry Pi Zero 2 W Status: {stock_data}
-    - Calendar Events: {calendar_text}
+    - Calendar Data:
+    {calendar_data}
 
-    If the Pi is in stock, make sure to emphasize it heavily so I don't miss it!
-    If there are calendar events, make it sound excited about the day ahead.
+    CRITICAL INSTRUCTIONS:
+    1. First, check if I have a WORK SHIFT today or tomorrow. If I do, make sure to highlight it near the beginning so I don't miss it.
+    2. Mention any other regular events happening today/tomorrow.
+    3. If I have upcoming deadlines listed, you MUST explicitly inform me of them using a format similar to this: "Just a heads up, your deadlines are on the following dates: [List them out]". 
+    4. If the Pi is in stock, emphasize it heavily!
     """
 
     response = model.generate_content(prompt)
@@ -144,7 +154,6 @@ def send_telegram_message(message):
     clean_token = BOT_TOKEN.replace("bot", "").strip()
     api_url = f"https://api.telegram.org/bot{clean_token}/sendMessage"
     
-    # parse_mode set to Markdown ensures bolding/italics render properly
     requests.post(api_url, data={
         "chat_id": CHAT_ID, 
         "text": message,
@@ -158,7 +167,7 @@ def main():
     print("Scouting target...")
     stock = check_pi_stock()
 
-    print("Fetching calendar events...")
+    print("Fetching and sorting calendar events...")
     calendar = get_calendar_events()
 
     print("Drafting AI Briefing...")

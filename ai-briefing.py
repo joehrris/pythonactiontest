@@ -60,11 +60,9 @@ def get_calendar_events():
         )
         service = build('calendar', 'v3', credentials=creds)
 
-        # Set time boundaries
         today = datetime.now()
         two_months_later = today + timedelta(days=60)
 
-        # Pull everything for the next 60 days (up to 150 events)
         events_result = service.events().list(
             calendarId=TARGET_CALENDAR, 
             timeMin=(today - timedelta(days=1)).isoformat() + 'Z',
@@ -87,7 +85,6 @@ def get_calendar_events():
             summary_lower = summary.lower()
             start = event.get('start', {})
             
-            # Safely parse Google Calendar dates
             start_date_str = start.get('dateTime', start.get('date', ''))
             if 'T' in start_date_str:
                 date_part = start_date_str.split('T')[0]
@@ -99,20 +96,15 @@ def get_calendar_events():
             event_date = datetime.strptime(date_part, '%Y-%m-%d').date()
             date_formatted = event_date.strftime('%b %d')
 
-            # --- SORTING LOGIC ---
-            
-            # 1. Is it happening Today or Tomorrow?
             if today_date <= event_date <= tomorrow_date:
                 if "shift" in summary_lower or "work" in summary_lower:
                     recent_events.append(f"• 💼 WORK SHIFT: {summary} ({time_part})")
                 else:
                     recent_events.append(f"• 📅 {summary} ({time_part})")
 
-            # 2. Is it a deadline in the next 60 days?
             if "deadline" in summary_lower or "due" in summary_lower:
                 deadline_events.append(f"• {date_formatted} - {summary}")
 
-        # Assemble the final intel package for Gemini
         final_intel = "=== TODAY & TOMORROW ===\n"
         final_intel += "\n".join(recent_events) if recent_events else "No immediate events."
         
@@ -125,13 +117,18 @@ def get_calendar_events():
         return f"Calendar error: {e}"
 
 def generate_ai_briefing(weather_data, stock_data, calendar_data):
-    """Passes the sorted intel to the AI to write the message"""
+    """Passes the sorted intel to the AI to write the message using HTML tags"""
     genai.configure(api_key=GEMINI_API_KEY)
     model = genai.GenerativeModel('gemini-2.5-flash-lite')
 
     prompt = f"""
     You are my highly capable personal assistant. Write a short, engaging morning text message for me.
-    Keep it conversational, use emojis naturally, and format it nicely for Telegram.
+    Keep it conversational and use emojis naturally.
+
+    Format the message using HTML tags ONLY for Telegram:
+    - Use <b>text</b> for bolding.
+    - Use <i>text</i> for italics.
+    Do NOT use Markdown (like ** or [link](url)).
 
     Here is the raw intel for today:
     - Weather in Coventry: {weather_data}
@@ -140,9 +137,9 @@ def generate_ai_briefing(weather_data, stock_data, calendar_data):
     {calendar_data}
 
     CRITICAL INSTRUCTIONS:
-    1. First, check if I have a WORK SHIFT today or tomorrow. If I do, make sure to highlight it near the beginning so I don't miss it.
+    1. Check if I have a WORK SHIFT today or tomorrow. Highlight it (e.g., using <b>) so I don't miss it.
     2. Mention any other regular events happening today/tomorrow.
-    3. If I have upcoming deadlines listed, you MUST explicitly inform me of them and prioritise them based on how close they're to being needed to be done using a format similar to this: "Just a heads up, your deadlines are on the following dates: [List them out]". 
+    3. If I have upcoming deadlines, you MUST inform me and prioritise them by date using this exact wording: "Just a heads up, your deadlines are on the following dates: [List them]".
     4. If the Pi is in stock, emphasize it heavily!
     """
 
@@ -150,15 +147,38 @@ def generate_ai_briefing(weather_data, stock_data, calendar_data):
     return response.text
 
 def send_telegram_message(message):
-    """Sends the final AI text to your phone"""
-    clean_token = BOT_TOKEN.replace("bot", "").strip()
-    api_url = f"https://api.telegram.org/bot{clean_token}/sendMessage"
+    """Sends the final AI text with heavy debugging"""
+    if not BOT_TOKEN:
+        print("❌ ERROR: TELEGRAM_TOKEN environment variable is missing!")
+        return
+
+    # Clean the token: Remove 'bot' only if it's at the start
+    token = BOT_TOKEN.strip()
+    if token.lower().startswith("bot"):
+        token = token[3:]
     
-    requests.post(api_url, data={
-        "chat_id": CHAT_ID, 
-        "text": message,
-        "parse_mode": "Markdown"
-    })
+    api_url = f"https://api.telegram.org/bot{token}/sendMessage"
+    print(f"📡 Attempting to send to Telegram (URL: https://api.telegram.org/bot{token[:5]}.../sendMessage)")
+    
+    try:
+        payload = {
+            "chat_id": CHAT_ID, 
+            "text": message,
+            "parse_mode": "HTML"
+        }
+        
+        response = requests.post(api_url, data=payload, timeout=15)
+        print(f"📥 Response Status Code: {response.status_code}")
+        
+        if response.status_code != 200:
+            print(f"❌ Telegram API Refused: {response.text}")
+        else:
+            print("✅ Success! Message sent to Telegram.")
+            
+    except requests.exceptions.Timeout:
+        print("❌ ERROR: Telegram request timed out after 15 seconds.")
+    except Exception as e:
+        print(f"🚨 ERROR during Telegram dispatch: {e}")
 
 def main():
     print("Gathering weather intel...")

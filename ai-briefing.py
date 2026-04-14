@@ -115,10 +115,12 @@ def get_calendar_events():
         return f"Calendar error: {e}"
 
 def get_reddit_drama():
-    # Using the .json endpoint makes Reddit return clean data instead of HTML
-    url = "https://www.reddit.com/r/youtubedrama/new.json?limit=10"
+    # Using old.reddit.com is often more reliable for scraping
+    url = "https://old.reddit.com/r/youtubedrama/new.json?limit=10"
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 TelegramMorningBot/1.0"
+        # Reddit aggressively blocks generic browser user-agents from datacenters like GitHub Actions. 
+        # Using their official API format bypasses most of these blocks.
+        "User-Agent": "script:morning-briefing-bot:v1.0"
     }
 
     try:

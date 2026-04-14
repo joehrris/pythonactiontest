@@ -127,11 +127,20 @@ def get_x_trending():
         response.raise_for_status()  # This will trigger the exception block if the site blocks us (e.g., 403 Forbidden)
         soup = BeautifulSoup(response.content, "html.parser")
         
-        # Using a more robust CSS selector that targets the lists directly
-        trends = soup.select(".trend-card__list li a", limit=5)
-        trend_list = [f"• {t.text.strip()}" for t in trends if t.text.strip()]
+        # Bulletproof selector: find any link pointing to a Twitter/X search
+        trend_links = soup.find_all("a", href=lambda href: href and ("twitter.com/search" in href or "x.com/search" in href))
         
-        return "\n".join(trend_list) if trend_list else "No trending topics found (HTML structure may have changed)."
+        unique_trends = []
+        for t in trend_links:
+            trend_text = t.text.strip()
+            if trend_text and trend_text not in unique_trends:
+                unique_trends.append(trend_text)
+            if len(unique_trends) >= 5:
+                break
+                
+        trend_list = [f"• {t}" for t in unique_trends]
+        
+        return "\n".join(trend_list) if trend_list else "No trending topics found (GitHub Actions IP might be blocked)."
     except Exception as e:
         return f"Error fetching trends: {e}"
 

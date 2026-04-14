@@ -17,7 +17,7 @@ jobs:
           python-version: '3.11' 
 
       - name: 3. Install Required Libraries
-        run: pip install requests beautifulsoup4 google-generativeai google-api-python-client google-auth-httplib2 google-auth pytz
+        run: pip install requests beautifulsoup4 google-genai google-api-python-client google-auth-httplib2 google-auth pytz
 
       - name: 4. Run AI Briefing Script
         env:

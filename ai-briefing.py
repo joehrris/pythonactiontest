@@ -1,7 +1,7 @@
 import os
 import requests
 from bs4 import BeautifulSoup
-import google.generativeai as genai
+from google import genai
 from datetime import datetime, timedelta
 import json
 import base64
@@ -12,7 +12,6 @@ BOT_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 TARGET_CALENDAR = os.environ.get("GOOGLE_CALENDAR_ID")
-NEWS_API_KEY = os.environ.get("NEWS_API_KEY")
 
 def get_coventry_weather():
     url = "https://api.open-meteo.com/v1/forecast?latitude=52.41&longitude=-1.51&daily=temperature_2m_max,precipitation_probability_max&timezone=Europe%2FLondon"
@@ -115,40 +114,23 @@ def get_calendar_events():
     except Exception as e:
         return f"Calendar error: {e}"
 
-def get_tech_news():
-    if not NEWS_API_KEY:
-        return "News API key missing."
-        
-    url = "https://newsapi.org/v2/everything"
-    params = {
-        "q": '("artificial intelligence" OR "AI" OR "computing")',
-        "sortBy": "relevancy",
-        "pageSize": 3,
-        "language": "en",
-        "apiKey": NEWS_API_KEY
-    }
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-    
-    try:
-        response = requests.get(url, headers=headers, params=params, timeout=10).json()
-        if response.get("status") != "ok":
-            return f"News API error: {response.get('message', 'Unknown error')}"
-            
-        articles = response.get("articles", [])
-        news_items = []
-        for article in articles:
-            title = article.get("title", "No Title")
-            source = article.get("source", {}).get("name", "Unknown Source")
-            article_url = article.get("url", "")
-            news_items.append(f"• {title} ({source}) - {article_url}")
-            
-        return "\n".join(news_items) if news_items else "No recent computing/AI news found."
-    except Exception as e:
-        return f"Error fetching news: {e}"
+def get_x_trending():
+    url = "https://trends24.in/united-kingdom/"
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
 
-def generate_ai_briefing(weather_data, stock_data, calendar_data, news_data):
-    genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-2.5-flash-lite')
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+        soup = BeautifulSoup(response.content, "html.parser")
+        
+        trends = soup.find_all("a", class_="trend-name", limit=5)
+        trend_list = [f"• {t.text.strip()}" for t in trends]
+        
+        return "\n".join(trend_list) if trend_list else "No trending topics found."
+    except Exception as e:
+        return f"Error fetching trends: {e}"
+
+def generate_ai_briefing(weather_data, stock_data, calendar_data, trending_data):
+    client = genai.Client(api_key=GEMINI_API_KEY)
 
     prompt = f"""
     You are my personal assistant. Write a short morning briefing.
@@ -157,16 +139,19 @@ def generate_ai_briefing(weather_data, stock_data, calendar_data, news_data):
     - Weather: {weather_data}
     - Pi Stock: {stock_data}
     - Calendar Info: {calendar_data}
-    - Top Tech/AI News: {news_data}
+    - X (Twitter) UK Trending: {trending_data}
 
     IMPORTANT: 
     - Pay extremely close attention to the labels "TODAY" and "TOMORROW" in the calendar info. 
     - If a WORK SHIFT is labeled as TOMORROW, do not say it is today.
     - List deadlines clearly as requested: "Just a heads up, your deadlines are on the following dates:..."
-    - Include brief bullet points reviewing the top 3 tech/AI news stories provided. Make them short and punchy.
-    - Use HTML for Telegram (<b>bold</b>, <i>italic</i>, <a href="...">links</a> for news articles if provided).
+    - Include brief bullet points reviewing the top 5 trending topics on X. Make them short, punchy, and offer a tiny bit of context or witty commentary if possible.
+    - Use HTML for Telegram (<b>bold</b>, <i>italic</i>).
     """
-    response = model.generate_content(prompt)
+    response = client.models.generate_content(
+        model='gemini-2.5-flash-lite',
+        contents=prompt,
+    )
     return response.text
 
 def send_telegram_message(message):

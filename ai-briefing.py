@@ -121,15 +121,16 @@ def get_tech_news():
         
     url = "https://newsapi.org/v2/everything"
     params = {
-        "q": '"artificial intelligence" OR computing',
-        "sortBy": "popularity",
+        "q": '("artificial intelligence" OR "AI" OR "computing")',
+        "sortBy": "relevancy",
         "pageSize": 3,
         "language": "en",
         "apiKey": NEWS_API_KEY
     }
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
     
     try:
-        response = requests.get(url, params=params, timeout=10).json()
+        response = requests.get(url, headers=headers, params=params, timeout=10).json()
         if response.get("status") != "ok":
             return f"News API error: {response.get('message', 'Unknown error')}"
             
@@ -138,8 +139,8 @@ def get_tech_news():
         for article in articles:
             title = article.get("title", "No Title")
             source = article.get("source", {}).get("name", "Unknown Source")
-            url = article.get("url", "")
-            news_items.append(f"• {title} ({source}) - {url}")
+            article_url = article.get("url", "")
+            news_items.append(f"• {title} ({source}) - {article_url}")
             
         return "\n".join(news_items) if news_items else "No recent computing/AI news found."
     except Exception as e:

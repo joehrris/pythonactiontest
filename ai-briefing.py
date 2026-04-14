@@ -114,37 +114,26 @@ def get_calendar_events():
     except Exception as e:
         return f"Calendar error: {e}"
 
-def get_x_trending():
-    url = "https://trends24.in/united-kingdom/"
+def get_reddit_drama():
+    # Using the .json endpoint makes Reddit return clean data instead of HTML
+    url = "https://www.reddit.com/r/youtubedrama/new.json?limit=10"
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.5"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 TelegramMorningBot/1.0"
     }
 
     try:
         response = requests.get(url, headers=headers, timeout=10)
-        response.raise_for_status()  # This will trigger the exception block if the site blocks us (e.g., 403 Forbidden)
-        soup = BeautifulSoup(response.content, "html.parser")
+        response.raise_for_status()
+        data = response.json()
         
-        # Bulletproof selector: find any link pointing to a Twitter/X search
-        trend_links = soup.find_all("a", href=lambda href: href and ("twitter.com/search" in href or "x.com/search" in href))
+        posts = data.get("data", {}).get("children", [])
+        drama_titles = [f"• {post['data']['title']}" for post in posts if 'data' in post and 'title' in post['data']]
         
-        unique_trends = []
-        for t in trend_links:
-            trend_text = t.text.strip()
-            if trend_text and trend_text not in unique_trends:
-                unique_trends.append(trend_text)
-            if len(unique_trends) >= 15:
-                break
-                
-        trend_list = [f"• {t}" for t in unique_trends]
-        
-        return "\n".join(trend_list) if trend_list else "No trending topics found (GitHub Actions IP might be blocked)."
+        return "\n".join(drama_titles) if drama_titles else "No recent YouTube drama found."
     except Exception as e:
-        return f"Error fetching trends: {e}"
+        return f"Error fetching Reddit drama: {e}"
 
-def generate_ai_briefing(weather_data, stock_data, calendar_data, trending_data):
+def generate_ai_briefing(weather_data, stock_data, calendar_data, drama_data):
     client = genai.Client(api_key=GEMINI_API_KEY)
 
     prompt = f"""
@@ -154,13 +143,13 @@ def generate_ai_briefing(weather_data, stock_data, calendar_data, trending_data)
     - Weather: {weather_data}
     - Pi Stock: {stock_data}
     - Calendar Info: {calendar_data}
-    - X (Twitter) UK Trending (Raw List): {trending_data}
+    - r/YouTubeDrama Post Titles: {drama_data}
 
     IMPORTANT: 
     - Pay extremely close attention to the labels "TODAY" and "TOMORROW" in the calendar info. 
     - If a WORK SHIFT is labeled as TOMORROW, do not say it is today.
     - List deadlines clearly as requested: "Just a heads up, your deadlines are on the following dates:..."
-    - The X (Twitter) list contains the top 15 raw trends. Filter out anything that is obviously sports (football teams, managers, etc.) or generic first names. Pick 3 to 5 trends from the list that sound the most like spicy internet drama, breaking news, or pop culture controversies. List them playfully. Do not confidently state fake news, but you can playfully speculate on why they might be trending (e.g., "Someone is definitely getting cancelled over [Trend] today...").
+    - The YouTube Drama list contains recent post titles from the r/youtubedrama subreddit. Pick 3 to 5 of the most interesting ones, summarize the tea, and add a little witty or sarcastic commentary. Have fun with it.
     - Use HTML for Telegram (<b>bold</b>, <i>italic</i>).
     """
     response = client.models.generate_content(
@@ -183,8 +172,8 @@ def main():
     weather = get_coventry_weather()
     stock = check_pi_stock()
     calendar = get_calendar_events()
-    trends = get_x_trending()
-    final_message = generate_ai_briefing(weather, stock, calendar, trends)
+    drama = get_reddit_drama()
+    final_message = generate_ai_briefing(weather, stock, calendar, drama)
     send_telegram_message(final_message)
 
 if __name__ == "__main__":

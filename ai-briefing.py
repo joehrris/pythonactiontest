@@ -151,7 +151,7 @@ def generate_ai_briefing(weather_data, stock_data, calendar_data, drama_data):
     - Pay extremely close attention to the labels "TODAY" and "TOMORROW" in the calendar info. 
     - If a WORK SHIFT is labeled as TOMORROW, do not say it is today.
     - List deadlines clearly as requested: "Just a heads up, your deadlines are on the following dates:..."
-    - The YouTube Drama list contains recent post titles from the r/youtubedrama subreddit. Pick 3 to 5 of the most interesting ones, summarize the tea, and add a little witty or sarcastic commentary. Have fun with it.
+    - The YouTube Drama list contains recent post titles from the r/youtubedrama subreddit. Pick 3 to 5 of the most interesting ones, summarize the tea, and add a little witty or sarcastic commentary. Have fun with it. If the drama data contains an error message or says it couldn't retrieve data, just briefly mention the hiccup and DO NOT make up or hallucinate any fake stories.
     - Use HTML for Telegram (<b>bold</b>, <i>italic</i>).
     """
     response = client.models.generate_content(

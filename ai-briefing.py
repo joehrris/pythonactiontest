@@ -12,6 +12,7 @@ BOT_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 TARGET_CALENDAR = os.environ.get("GOOGLE_CALENDAR_ID")
+NEWS_API_KEY = os.environ.get("NEWS_API_KEY")
 
 def get_coventry_weather():
     url = "https://api.open-meteo.com/v1/forecast?latitude=52.41&longitude=-1.51&daily=temperature_2m_max,precipitation_probability_max&timezone=Europe%2FLondon"
@@ -114,7 +115,37 @@ def get_calendar_events():
     except Exception as e:
         return f"Calendar error: {e}"
 
-def generate_ai_briefing(weather_data, stock_data, calendar_data):
+def get_tech_news():
+    if not NEWS_API_KEY:
+        return "News API key missing."
+        
+    url = "https://newsapi.org/v2/everything"
+    params = {
+        "q": '"artificial intelligence" OR computing',
+        "sortBy": "popularity",
+        "pageSize": 3,
+        "language": "en",
+        "apiKey": NEWS_API_KEY
+    }
+    
+    try:
+        response = requests.get(url, params=params, timeout=10).json()
+        if response.get("status") != "ok":
+            return f"News API error: {response.get('message', 'Unknown error')}"
+            
+        articles = response.get("articles", [])
+        news_items = []
+        for article in articles:
+            title = article.get("title", "No Title")
+            source = article.get("source", {}).get("name", "Unknown Source")
+            url = article.get("url", "")
+            news_items.append(f"• {title} ({source}) - {url}")
+            
+        return "\n".join(news_items) if news_items else "No recent computing/AI news found."
+    except Exception as e:
+        return f"Error fetching news: {e}"
+
+def generate_ai_briefing(weather_data, stock_data, calendar_data, news_data):
     genai.configure(api_key=GEMINI_API_KEY)
     model = genai.GenerativeModel('gemini-2.5-flash-lite')
 
@@ -125,12 +156,14 @@ def generate_ai_briefing(weather_data, stock_data, calendar_data):
     - Weather: {weather_data}
     - Pi Stock: {stock_data}
     - Calendar Info: {calendar_data}
+    - Top Tech/AI News: {news_data}
 
     IMPORTANT: 
     - Pay extremely close attention to the labels "TODAY" and "TOMORROW" in the calendar info. 
     - If a WORK SHIFT is labeled as TOMORROW, do not say it is today.
     - List deadlines clearly as requested: "Just a heads up, your deadlines are on the following dates:..."
-    - Use HTML for Telegram (<b>bold</b>, <i>italic</i>).
+    - Include brief bullet points reviewing the top 3 tech/AI news stories provided. Make them short and punchy.
+    - Use HTML for Telegram (<b>bold</b>, <i>italic</i>, <a href="...">links</a> for news articles if provided).
     """
     response = model.generate_content(prompt)
     return response.text
@@ -149,7 +182,8 @@ def main():
     weather = get_coventry_weather()
     stock = check_pi_stock()
     calendar = get_calendar_events()
-    final_message = generate_ai_briefing(weather, stock, calendar)
+    news = get_tech_news()
+    final_message = generate_ai_briefing(weather, stock, calendar, news)
     send_telegram_message(final_message)
 
 if __name__ == "__main__":

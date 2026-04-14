@@ -135,7 +135,7 @@ def get_x_trending():
             trend_text = t.text.strip()
             if trend_text and trend_text not in unique_trends:
                 unique_trends.append(trend_text)
-            if len(unique_trends) >= 5:
+            if len(unique_trends) >= 15:
                 break
                 
         trend_list = [f"• {t}" for t in unique_trends]
@@ -154,13 +154,13 @@ def generate_ai_briefing(weather_data, stock_data, calendar_data, trending_data)
     - Weather: {weather_data}
     - Pi Stock: {stock_data}
     - Calendar Info: {calendar_data}
-    - X (Twitter) UK Trending: {trending_data}
+    - X (Twitter) UK Trending (Raw List): {trending_data}
 
     IMPORTANT: 
     - Pay extremely close attention to the labels "TODAY" and "TOMORROW" in the calendar info. 
     - If a WORK SHIFT is labeled as TOMORROW, do not say it is today.
     - List deadlines clearly as requested: "Just a heads up, your deadlines are on the following dates:..."
-    - Include brief bullet points reviewing the top 5 trending topics on X. Make them short, punchy, and offer a tiny bit of context or witty commentary if possible.
+    - The X (Twitter) list contains the top 15 raw trends. Filter out anything that is obviously sports (football teams, managers, etc.) or generic first names. Pick 3 to 5 trends from the list that sound the most like spicy internet drama, breaking news, or pop culture controversies. List them playfully. Do not confidently state fake news, but you can playfully speculate on why they might be trending (e.g., "Someone is definitely getting cancelled over [Trend] today...").
     - Use HTML for Telegram (<b>bold</b>, <i>italic</i>).
     """
     response = client.models.generate_content(

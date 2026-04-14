@@ -115,21 +115,21 @@ def get_calendar_events():
         return f"Calendar error: {e}"
 
 def get_reddit_drama():
-    # Using old.reddit.com is often more reliable for scraping
-    url = "https://old.reddit.com/r/youtubedrama/new.json?limit=10"
-    headers = {
-        # Reddit aggressively blocks generic browser user-agents from datacenters like GitHub Actions. 
-        # Using their official API format bypasses most of these blocks.
-        "User-Agent": "script:morning-briefing-bot:v1.0"
-    }
+    # Reddit outright blocks GitHub Actions IPs. 
+    # We bypass this by routing Reddit's RSS feed through a free RSS-to-JSON proxy.
+    rss_url = "https://www.reddit.com/r/youtubedrama/new.rss"
+    url = f"https://api.rss2json.com/v1/api.json?rss_url={rss_url}"
 
     try:
-        response = requests.get(url, headers=headers, timeout=10)
+        response = requests.get(url, timeout=10)
         response.raise_for_status()
         data = response.json()
         
-        posts = data.get("data", {}).get("children", [])
-        drama_titles = [f"• {post['data']['title']}" for post in posts if 'data' in post and 'title' in post['data']]
+        if data.get("status") != "ok":
+            return "Could not retrieve Reddit data from proxy."
+            
+        items = data.get("items", [])
+        drama_titles = [f"• {item.get('title', 'Unknown Title')}" for item in items[:10]]
         
         return "\n".join(drama_titles) if drama_titles else "No recent YouTube drama found."
     except Exception as e:

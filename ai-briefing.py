@@ -183,8 +183,8 @@ def main():
     weather = get_coventry_weather()
     stock = check_pi_stock()
     calendar = get_calendar_events()
-    news = get_tech_news()
-    final_message = generate_ai_briefing(weather, stock, calendar, news)
+    trends = get_x_trending()
+    final_message = generate_ai_briefing(weather, stock, calendar, trends)
     send_telegram_message(final_message)
 
 if __name__ == "__main__":

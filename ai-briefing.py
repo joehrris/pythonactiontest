@@ -116,16 +116,22 @@ def get_calendar_events():
 
 def get_x_trending():
     url = "https://trends24.in/united-kingdom/"
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5"
+    }
 
     try:
         response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()  # This will trigger the exception block if the site blocks us (e.g., 403 Forbidden)
         soup = BeautifulSoup(response.content, "html.parser")
         
-        trends = soup.find_all("a", class_="trend-name", limit=5)
-        trend_list = [f"• {t.text.strip()}" for t in trends]
+        # Using a more robust CSS selector that targets the lists directly
+        trends = soup.select(".trend-card__list li a", limit=5)
+        trend_list = [f"• {t.text.strip()}" for t in trends if t.text.strip()]
         
-        return "\n".join(trend_list) if trend_list else "No trending topics found."
+        return "\n".join(trend_list) if trend_list else "No trending topics found (HTML structure may have changed)."
     except Exception as e:
         return f"Error fetching trends: {e}"
 

@@ -1,7 +1,7 @@
 name: AI Morning Briefing
 
 on:
-  workflow_dispatch: # Allows cron-job.org to trigger this via the GitHub API
+  #workflow_dispatch: 
 
 jobs:
   briefing-job:
